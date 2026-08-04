@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +22,7 @@ EXIT_OK = 0
 EXIT_USAGE = 2
 EXIT_INVALID_DATA = 3
 EXIT_INCOMPLETE_SNAPSHOT = 4
+EXIT_BROKEN_PIPE = 5
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -146,7 +149,25 @@ def main(
     args = build_parser().parse_args(argv)
     output = stdout if stdout is not None else sys.stdout
     errors = stderr if stderr is not None else sys.stderr
+    try:
+        return _run(args, output=output, errors=errors)
+    except BrokenPipeError:
+        _discard_broken_stdout(output)
+        return EXIT_BROKEN_PIPE
 
+
+def _discard_broken_stdout(stream: TextIO) -> None:
+    """Stop the interpreter reporting the same broken pipe again at exit.
+
+    Only the real stdout needs this. An injected stream belongs to the caller.
+    """
+    if stream is not sys.stdout:
+        return
+    with suppress(OSError, ValueError):
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+
+
+def _run(args: argparse.Namespace, *, output: TextIO, errors: TextIO) -> int:
     if args.command == "version":
         output.write(f"mailjanitor {__version__}\n")
         return EXIT_OK

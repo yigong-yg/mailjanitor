@@ -13,6 +13,7 @@ import pytest
 
 from mailjanitor import __version__
 from mailjanitor.cli import (
+    EXIT_BROKEN_PIPE,
     EXIT_INCOMPLETE_SNAPSHOT,
     EXIT_INVALID_DATA,
     EXIT_OK,
@@ -188,3 +189,19 @@ def test_python_module_entrypoint_exits_with_cli_status(
 
     assert caught.value.code == EXIT_OK
     assert capsys.readouterr().out == f"mailjanitor {__version__}\n"
+
+
+class _BrokenPipeStream(StringIO):
+    """A stream that fails the way a closed downstream pipe does."""
+
+    def write(self, s: str, /) -> int:  # noqa: ARG002
+        raise BrokenPipeError(32, "downstream closed the pipe")
+
+
+def test_closed_downstream_pipe_exits_without_a_traceback() -> None:
+    errors = StringIO()
+
+    code = main(["version"], stdout=_BrokenPipeStream(), stderr=errors)
+
+    assert code == EXIT_BROKEN_PIPE
+    assert errors.getvalue() == ""
