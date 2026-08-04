@@ -454,8 +454,12 @@ class AuditLedger:
             lock.flush()
             yield
         finally:
-            lock.close()
-            with suppress(FileNotFoundError):
+            # Cleanup must not raise; see SqliteOperationalState.profile_lock.
+            # A failed unlink leaves a stale lock that fails closed, which is
+            # preferable to discarding the result of a durable append.
+            with suppress(OSError):
+                lock.close()
+            with suppress(OSError):
                 self._lock_path.unlink()
 
 

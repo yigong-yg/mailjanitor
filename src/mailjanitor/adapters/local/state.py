@@ -70,8 +70,14 @@ class SqliteOperationalState:
             os.fsync(lock.fileno())
             yield
         finally:
-            lock.close()
-            with suppress(FileNotFoundError):
+            # Cleanup must not raise. On Windows an antivirus or indexer holding
+            # the lock file open makes unlink fail, and an exception here would
+            # replace the caller's ExecutionReport for actions that already
+            # mutated the mailbox. A surviving lock is the safe direction: the
+            # next run fails closed and the operator guide covers stale locks.
+            with suppress(OSError):
+                lock.close()
+            with suppress(OSError):
                 lock_path.unlink()
 
     def get(self, idempotency_key: str) -> StoredExecution | None:

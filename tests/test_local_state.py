@@ -210,3 +210,23 @@ def test_dangling_state_symlink_fails_closed(tmp_path: Path) -> None:
 
     with pytest.raises(OperationalStateError, match="regular file"):
         SqliteOperationalState(path)
+
+
+def test_profile_lock_release_survives_a_failing_unlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = make_state(tmp_path)
+    original = Path.unlink
+
+    def refuse(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name.endswith(".lock"):
+            raise PermissionError(32, "held open by another process")
+        original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", refuse)
+
+    with state.profile_lock(MAILBOX_REF):
+        pass
+
+    stale = tmp_path / f"state.sqlite3.{MAILBOX_REF}.lock"
+    assert stale.exists()
