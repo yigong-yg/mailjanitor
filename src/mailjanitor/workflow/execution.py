@@ -857,15 +857,34 @@ def _prepare_selected(
     approval: ApprovalArtifact,
     selected: tuple[ActionSpec, ...],
 ) -> tuple[_PreparedAction, ...]:
-    """Construct every selected command before any provider-facing call."""
+    """Construct every selected command before any provider-facing call.
+
+    ``ActionProposal.digest`` re-serializes every line on each access, so the
+    run-level digests are resolved once here and threaded through rather than
+    recomputed per action.
+    """
+    proposal_digest = proposal.digest
+    approval_digest = approval.digest
     prepared: list[_PreparedAction] = []
     for action in sorted(selected, key=lambda item: item.action_id):
-        command = _command_for(proposal, approval, action)
+        command = _command_for(
+            proposal,
+            approval,
+            action,
+            proposal_digest=proposal_digest,
+            approval_digest=approval_digest,
+        )
         prepared.append(
             _PreparedAction(
                 action=action,
                 command=command,
-                intent=_intent_for(proposal, approval, action, command),
+                intent=_intent_for(
+                    proposal,
+                    action,
+                    command,
+                    proposal_digest=proposal_digest,
+                    approval_digest=approval_digest,
+                ),
             )
         )
     return tuple(prepared)
@@ -875,19 +894,23 @@ def _command_for(
     proposal: ActionProposal,
     approval: ApprovalArtifact,
     action: ActionSpec,
+    *,
+    proposal_digest: str,
+    approval_digest: str,
 ) -> ApprovedMailboxCommand:
+    line_digest = action.line_digest
     idempotency_key = canonical_digest(
         {
-            "proposal_digest": proposal.digest,
+            "proposal_digest": proposal_digest,
             "action_id": action.action_id,
-            "line_digest": action.line_digest,
+            "line_digest": line_digest,
         }
     )
     return ApprovedMailboxCommand(
         action_id=action.action_id,
-        proposal_digest=proposal.digest,
-        approval_digest=approval.digest,
-        line_digest=action.line_digest,
+        proposal_digest=proposal_digest,
+        approval_digest=approval_digest,
+        line_digest=line_digest,
         approval_id=approval.approval_id,
         mailbox_ref=proposal.mailbox_ref,
         target=action.target.item_ref,
@@ -899,14 +922,16 @@ def _command_for(
 
 def _intent_for(
     proposal: ActionProposal,
-    approval: ApprovalArtifact,
     action: ActionSpec,
     command: ApprovedMailboxCommand,
+    *,
+    proposal_digest: str,
+    approval_digest: str,
 ) -> ExecutionIntent:
     return ExecutionIntent(
         idempotency_key=command.idempotency_key,
-        proposal_digest=proposal.digest,
-        approval_digest=approval.digest,
+        proposal_digest=proposal_digest,
+        approval_digest=approval_digest,
         action_id=action.action_id,
         mailbox_ref=proposal.mailbox_ref,
         target_ref=action.target.target_ref,
