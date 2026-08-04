@@ -13,6 +13,7 @@ from mailjanitor.adapters.local.audit import (
     AuditTail,
     AuditUnavailableError,
 )
+from mailjanitor.canonical import canonical_bytes
 
 KEY = b"audit-integrity-key-is-at-least-32-bytes"
 DIGEST_A = f"sha256:{'a' * 64}"
@@ -256,3 +257,34 @@ def test_short_integrity_key_is_rejected(tmp_path: Path) -> None:
             integrity_key=b"short",
             anchor=MemoryAnchor(),
         )
+
+
+def test_forged_record_with_canonical_encoding_fails_the_mac_check(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "actions.jsonl"
+    ledger = make_ledger(path, MemoryAnchor())
+    append_started(ledger)
+
+    record = json.loads(path.read_bytes())
+    record["event_type"] = "action.succeeded"
+    path.write_bytes(canonical_bytes(record) + b"\n")
+
+    with pytest.raises(AuditIntegrityError, match="MAC mismatch"):
+        ledger.verify()
+
+
+def test_relinked_record_fails_the_chain_predecessor_check(tmp_path: Path) -> None:
+    path = tmp_path / "actions.jsonl"
+    anchor = MemoryAnchor()
+    ledger = make_ledger(path, anchor)
+    append_started(ledger)
+    append_started(ledger)
+
+    first, second = path.read_bytes().splitlines()
+    record = json.loads(second)
+    record["previous_mac"] = "0" * 64
+    path.write_bytes(first + b"\n" + canonical_bytes(record) + b"\n")
+
+    with pytest.raises(AuditIntegrityError, match="predecessor"):
+        ledger.verify()

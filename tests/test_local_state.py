@@ -219,10 +219,10 @@ def test_profile_lock_release_survives_a_failing_unlink(
     state = make_state(tmp_path)
     original = Path.unlink
 
-    def refuse(self: Path, *args: object, **kwargs: object) -> None:
+    def refuse(self: Path, missing_ok: bool = False) -> None:  # noqa: FBT002
         if self.name.endswith(".lock"):
             raise PermissionError(32, "held open by another process")
-        original(self, *args, **kwargs)
+        original(self, missing_ok=missing_ok)
 
     monkeypatch.setattr(Path, "unlink", refuse)
 
@@ -244,3 +244,32 @@ def test_journal_mode_is_configured_once_and_survives_reopen(tmp_path: Path) -> 
 
     reopened = SqliteOperationalState(path)
     assert reopened.get(DIGEST_A) is None
+
+
+def test_reconciliation_can_close_an_undispatched_intent(tmp_path: Path) -> None:
+    state = make_state(tmp_path)
+    intent = make_intent()
+    state.record_intent(intent)
+
+    state.record_terminal(
+        intent.idempotency_key,
+        DurableActionStatus.REQUIRES_NEW_APPROVAL,
+        "authorization_expired",
+    )
+
+    stored = state.get(intent.idempotency_key)
+    assert stored is not None
+    assert stored.status is DurableActionStatus.REQUIRES_NEW_APPROVAL
+
+
+def test_undispatched_intent_cannot_claim_a_provider_success(tmp_path: Path) -> None:
+    state = make_state(tmp_path)
+    intent = make_intent()
+    state.record_intent(intent)
+
+    with pytest.raises(OperationalStateError, match="transition"):
+        state.record_terminal(
+            intent.idempotency_key,
+            DurableActionStatus.SUCCEEDED,
+            "applied",
+        )

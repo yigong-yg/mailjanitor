@@ -174,13 +174,14 @@ class StubWriter:
         self.reconcile_calls = 0
         self.executed_action_ids: list[str] = []
         self.supported_actions = frozenset({ActionType.SET_READ_STATE})
+        self.strong_preconditions = True
 
     def capabilities(self, requested_profile: MailboxProfileRef) -> WriterCapabilities:
         assert requested_profile == profile()
         return WriterCapabilities(
             identity=self.identity,
             supported_actions=self.supported_actions,
-            strong_preconditions=True,
+            strong_preconditions=self.strong_preconditions,
         )
 
     def execute_one(self, command: ApprovedMailboxCommand) -> WriteResult:
@@ -1420,3 +1421,47 @@ def test_full_audit_binding_must_match_durable_state(
         )
 
     assert writer.execute_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("mutate", "match"),
+    [
+        ("identity", "writer mailbox identity mismatch"),
+        ("preconditions", "writer lacks strong preconditions"),
+        ("actions", "does not support an approved action"),
+    ],
+)
+def test_writer_preflight_denials_stop_before_any_dispatch(
+    mutate: str, match: str
+) -> None:
+    trace: list[str] = []
+    source = current_state()
+    plan = proposal(state=source)
+    writer = StubWriter(trace)
+    if mutate == "identity":
+        writer.identity = AdapterIdentity(
+            profile=profile(),
+            account_fingerprint=f"sha256:{'c' * 64}",
+        )
+    elif mutate == "preconditions":
+        writer.strong_preconditions = False
+    else:
+        writer.supported_actions = frozenset({ActionType.MOVE_MESSAGE})
+
+    executor = make_executor(
+        reader=StubReader(source, trace),
+        writer=writer,
+        state=MemoryState(trace),
+        audit=MemoryAudit(trace),
+    )
+
+    with pytest.raises(ExecutionPreflightError, match=match):
+        executor.execute(
+            plan,
+            approve(plan),
+            run_id=RUN_ID,
+            expected_mailbox_ref=MAILBOX_REF,
+        )
+
+    assert writer.execute_calls == 0
+    assert "writer.execute" not in trace

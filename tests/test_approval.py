@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 import pytest
 
@@ -275,4 +276,66 @@ def test_short_key_and_approval_outliving_proposal_are_rejected() -> None:
             [ACTION_ID],
             approved_at=NOW,
             expires_at=NOW + timedelta(hours=2),
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("approval_id", "not-a-uuid"),
+        ("proposal_id", "not-a-uuid"),
+        ("approval_nonce", "z" * 64),
+        ("proposal_digest", "sha256:short"),
+        ("mailbox_ref", "owner@example.invalid"),
+        ("approved_action_ids", [ACTION_ID]),
+        ("approved_action_ids", (ACTION_ID, ACTION_ID)),
+        ("key_id", "UPPER"),
+        ("auth_tag", "hmac-sha256:xyz"),
+    ],
+)
+def test_malformed_approval_fields_fail_closed(field: str, value: object) -> None:
+    _, approval = issue()
+
+    with pytest.raises(ApprovalValidationError):
+        replace(approval, **cast("Any", {field: value}))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("approved_at", NOW.replace(tzinfo=None)),
+        ("expires_at", NOW - timedelta(minutes=1)),
+    ],
+)
+def test_approval_timestamps_must_be_aware_and_ordered(
+    field: str, value: object
+) -> None:
+    _, approval = issue()
+
+    with pytest.raises(ApprovalValidationError):
+        replace(approval, **cast("Any", {field: value}))
+
+
+def test_same_key_under_a_different_key_id_does_not_verify() -> None:
+    plan, approval = issue()
+    other = ApprovalService(key=KEY, key_id="rotated")
+
+    with pytest.raises(ApprovalAuthenticationError, match="key identifier"):
+        other.verify(
+            plan,
+            approval,
+            now=NOW,
+            expected_mailbox_ref=MAILBOX_REF,
+        )
+
+
+def test_approval_dated_after_the_verification_clock_is_refused() -> None:
+    plan, approval = issue()
+
+    with pytest.raises(ApprovalValidationError, match="future"):
+        service().verify(
+            plan,
+            approval,
+            now=NOW - timedelta(minutes=1),
+            expected_mailbox_ref=MAILBOX_REF,
         )
