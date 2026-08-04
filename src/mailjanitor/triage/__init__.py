@@ -1,0 +1,1 @@
+"""Pure metadata classification."""
