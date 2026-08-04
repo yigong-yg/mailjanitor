@@ -38,7 +38,7 @@ def change_token(version: int) -> str:
 
 
 def profile() -> MailboxProfileRef:
-    return MailboxProfileRef(provider=ProviderKind.FAKE, profile_id="synthetic")
+    return MailboxProfileRef(provider=ProviderKind.FIXTURE, profile_id="synthetic")
 
 
 def make_proposal() -> ActionProposal:

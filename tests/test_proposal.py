@@ -35,7 +35,7 @@ def change_token(version: int) -> str:
 
 
 def profile() -> MailboxProfileRef:
-    return MailboxProfileRef(provider=ProviderKind.FAKE, profile_id="synthetic")
+    return MailboxProfileRef(provider=ProviderKind.FIXTURE, profile_id="synthetic")
 
 
 def target() -> TargetSpec:
@@ -180,7 +180,7 @@ def test_all_initial_action_types_are_exactly_serialized() -> None:
 
 def test_cross_profile_move_is_rejected_at_proposal_line_construction() -> None:
     other_profile = MailboxProfileRef(
-        provider=ProviderKind.FAKE,
+        provider=ProviderKind.FIXTURE,
         profile_id="synthetic-other",
     )
 

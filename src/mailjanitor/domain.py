@@ -170,7 +170,6 @@ class ProviderKind(StrEnum):
     """Supported adapter identities; availability is a separate capability."""
 
     FIXTURE = "fixture"
-    FAKE = "fixture"
     GRAPH = "graph"
     OUTLOOK_COM = "outlook_com"
 
