@@ -157,6 +157,20 @@ ENV/
 env.bak/
 venv.bak/
 
+# mailjanitor operational state belongs outside the repository. This fallback
+# path is ignored defensively in case a developer opts into a local sandbox.
+.mailjanitor/
+.artifact-smoke/
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Workstation-only agent configuration and account-specific handoffs are never
+# repository or release material.
+.claude/
+/.codex/
+/AGENTS.md
+/docs/HANDOFF-*
+
 # Spyder project settings
 .spyderproject
 .spyproject

@@ -1,0 +1,13 @@
+# Normalize source artifacts across Windows and POSIX checkouts.
+* text=auto eol=lf
+
+# Never apply line-ending conversion to binary artifacts.
+*.gif binary
+*.gz binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.png binary
+*.whl binary
+*.zip binary

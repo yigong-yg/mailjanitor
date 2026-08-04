@@ -1,0 +1,178 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mailjanitor"
+dynamic = ["version"]
+description = "Offline-first, metadata-only mailbox triage with approval-gated actions"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "mailjanitor maintainers" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Communications :: Email",
+  "Topic :: Security",
+]
+dependencies = [
+  "rfc8785>=0.1.4,<0.2",
+]
+
+[project.scripts]
+mailjanitor = "mailjanitor.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/yigong-yg/mailjanitor/tree/main/docs"
+Issues = "https://github.com/yigong-yg/mailjanitor/issues"
+Repository = "https://github.com/yigong-yg/mailjanitor"
+Security = "https://github.com/yigong-yg/mailjanitor/security/advisories/new"
+
+[tool.hatch.version]
+path = "src/mailjanitor/__init__.py"
+
+[dependency-groups]
+dev = [
+  "hypothesis>=6,<7",
+  "mypy>=1.15,<2",
+  "pytest>=8,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.11,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mailjanitor"]
+
+[tool.hatch.build]
+reproducible = true
+skip-excluded-dirs = true
+
+[tool.hatch.build.targets.sdist]
+# Source distributions are a publication boundary. Use a positive allowlist so
+# workstation-only files cannot leak merely because they are locally present.
+include = [
+  "/.editorconfig",
+  "/.gitattributes",
+  "/.github/dependabot.yml",
+  "/.github/workflows/ci.yml",
+  "/.gitignore",
+  "/LICENSE",
+  "/README.md",
+  "/SECURITY.md",
+  "/docs/actions",
+  "/docs/adr",
+  "/docs/architecture",
+  "/docs/implementation-status.md",
+  "/docs/operator-guide.md",
+  "/docs/security",
+  "/pyproject.toml",
+  "/scripts",
+  "/src",
+  "/tests",
+  "/uv.lock",
+]
+exclude = [
+  "/.claude",
+  "/.codex",
+  "/AGENTS.md",
+  "/docs/HANDOFF-*",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["docs/actions"]
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "ANN",
+  "ARG",
+  "ASYNC",
+  "B",
+  "BLE",
+  "C4",
+  "C90",
+  "DTZ",
+  "E",
+  "F",
+  "FBT",
+  "FLY",
+  "FURB",
+  "I",
+  "INP",
+  "LOG",
+  "N",
+  "PERF",
+  "PIE",
+  "PL",
+  "PT",
+  "PTH",
+  "PYI",
+  "RET",
+  "RSE",
+  "RUF",
+  "S",
+  "SIM",
+  "SLF",
+  "T10",
+  "T20",
+  "TC",
+  "TRY",
+  "UP",
+  "W",
+]
+ignore = [
+  "ANN401",
+  "PLR0913",
+  # These rules favor indirection or import churn without improving this
+  # small, fully typed security core. Concrete complexity and safety rules
+  # remain enabled.
+  "TC003",
+  "TRY003",
+  "TRY301",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["FBT001", "S101", "S106", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+pretty = true
+show_error_codes = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+  "--cov=mailjanitor",
+  "--cov-branch",
+  "--cov-report=term-missing:skip-covered",
+  "--cov-fail-under=90",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["mailjanitor"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  '^\s*\.\.\.\s*$',
+]
+show_missing = true
+skip_covered = true
+fail_under = 90

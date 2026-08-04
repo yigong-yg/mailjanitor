@@ -1,0 +1,1 @@
+"""mailjanitor test suite."""
