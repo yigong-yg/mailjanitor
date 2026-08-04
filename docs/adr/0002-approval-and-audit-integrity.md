@@ -173,10 +173,18 @@ enable them.
 Each action uses:
 
 ```text
-idempotency_key = SHA-256(
-    proposal_digest || action_id || canonical(desired_state)
-)
+idempotency_key = SHA-256(canonical({
+    "proposal_digest": proposal_digest,
+    "action_id":       action_id,
+    "line_digest":     line_digest,
+}))
 ```
+
+`line_digest` covers the exact target reference, the expected before-state
+precondition, the typed action, and the summary text the owner reviewed, so the
+key binds strictly more than the desired state alone. It deliberately excludes
+the approval digest: re-approving the same proposal line must resolve to the
+same key so a replay is recognized rather than issued a second time.
 
 Before the provider call, the executor appends and durably flushes an
 `action.started` event. It then appends `action.succeeded`, `action.failed`, or

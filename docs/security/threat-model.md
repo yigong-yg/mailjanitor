@@ -209,7 +209,8 @@ actions at all.
 ## Replay, concurrency, and provider failure
 
 Each action has an idempotency key derived from the proposal digest, action
-identifier, and canonical desired state. Before a provider call, the executor
+identifier, and line digest, where the line digest covers the exact target, the
+expected before-state, the typed action, and the reviewed summary text. Before a provider call, the executor
 appends and flushes an `action.started` event containing that key. It then
 records exactly one of `succeeded`, `failed`, or `indeterminate`.
 
