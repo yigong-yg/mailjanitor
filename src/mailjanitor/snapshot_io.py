@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Final, cast
 
@@ -25,6 +26,13 @@ from mailjanitor.domain import (
 
 _MAX_SAFE_INTEGER: Final = (1 << 53) - 1
 _MAX_SAFE_INTEGER_DIGITS: Final = 16
+# ``datetime.fromisoformat`` also accepts basic format, a space separator, and a
+# comma fraction.  Those spellings parse to the same instant, so accepting them
+# would let textually different files share one snapshot digest.  Match only the
+# exact spelling the exporter emits.
+_CANONICAL_UTC_RE: Final = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{6})?Z"
+)
 _NOFOLLOW_FLAG: Final = getattr(os, "O_NOFOLLOW", 0)
 _OPEN_FLAGS: Final = (
     os.O_RDONLY
@@ -275,15 +283,12 @@ def _string_tuple(value: object, name: str) -> tuple[str, ...]:
 
 def _utc(value: object, name: str) -> datetime:
     text = _string(value, name)
-    if not text.endswith("Z"):
+    if _CANONICAL_UTC_RE.fullmatch(text) is None:
         raise SnapshotFormatError(f"{name} must be canonical UTC")
     try:
-        parsed = datetime.fromisoformat(text)
+        return datetime.fromisoformat(text)
     except ValueError as exc:
         raise SnapshotFormatError(f"{name} is not a timestamp") from exc
-    if parsed.tzinfo is None or parsed.astimezone(UTC) != parsed:
-        raise SnapshotFormatError(f"{name} must be canonical UTC")
-    return parsed
 
 
 def _object_without_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:

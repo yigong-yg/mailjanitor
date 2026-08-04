@@ -144,9 +144,29 @@ def test_non_integer_numbers_are_rejected(number: bytes) -> None:
         snapshot_from_bytes(raw)
 
 
-def test_snapshot_requires_canonical_utc() -> None:
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-08-03T12:00:00-06:00",
+        "2026-08-03T12:00:00+00:00",
+        "20260803T120000Z",
+        "2026-08-03 12:00:00Z",
+        "2026-08-03T12:00:00,500000Z",
+        "2026-08-03T12:00:00.5Z",
+        "2026-08-03T12:00:00z",
+    ],
+)
+def test_snapshot_requires_canonical_utc(timestamp: str) -> None:
     document = json.loads(snapshot_bytes(make_snapshot()))
-    document["as_of"] = "2026-08-03T12:00:00-06:00"
+    document["as_of"] = timestamp
+
+    with pytest.raises(SnapshotFormatError, match="canonical UTC"):
+        snapshot_from_bytes(json.dumps(document).encode())
+
+
+def test_equivalent_timestamp_spellings_cannot_share_a_digest() -> None:
+    document = json.loads(snapshot_bytes(make_snapshot()))
+    document["as_of"] = "2026-08-03 18:00:00Z"
 
     with pytest.raises(SnapshotFormatError, match="canonical UTC"):
         snapshot_from_bytes(json.dumps(document).encode())
@@ -256,7 +276,8 @@ def test_domain_constructor_errors_are_wrapped_as_format_errors() -> None:
         (("snapshot_id",), 1, "string"),
         (("complete",), 1, "boolean"),
         (("rejected_record_count",), "zero", "integer"),
-        (("as_of",), "not-a-timeZ", "timestamp"),
+        (("as_of",), "2026-13-45T99:99:99Z", "timestamp"),
+        (("as_of",), "not-a-timeZ", "canonical UTC"),
     ],
 )
 def test_structural_type_errors_are_specific(
