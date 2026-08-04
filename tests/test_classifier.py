@@ -118,6 +118,24 @@ def test_brand_domain_mismatch_is_suspect_and_wins_precedence() -> None:
     assert "claimed_brand:acme" in result.evidence[0].signals
 
 
+@pytest.mark.parametrize(
+    "hidden",
+    ["\u200b", "\u00ad", "\u2060", "\ufeff"],
+)
+def test_invisible_characters_cannot_split_a_claimed_brand(hidden: str) -> None:
+    message = _message(
+        "brand-hidden",
+        address="alert@unrelated.test",
+        display_name=f"Ac{hidden}me Security",
+        subject="Security login alert",
+    )
+
+    result = classify_snapshot(_snapshot(message), _policy()).classifications[0]
+
+    assert result.primary_bucket is TriageBucket.SUSPECT
+    assert result.evidence[0].rule_id == "suspect.brand_domain_mismatch.v1"
+
+
 @pytest.mark.parametrize("theme", ["Invoice payment due", "Parcel delivery delayed"])
 def test_attachment_lure_in_junk_is_suspect(theme: str) -> None:
     message = _message(

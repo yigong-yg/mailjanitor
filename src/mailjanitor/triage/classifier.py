@@ -16,7 +16,7 @@ from mailjanitor.domain import (
     validate_opaque_id,
 )
 
-CLASSIFIER_VERSION = "2"
+CLASSIFIER_VERSION = "3"
 MIN_ROTATING_SENDERS = 2
 MAX_ROTATING_SENDERS = 20
 MAX_SEVERITY = 100
@@ -389,6 +389,10 @@ def _tokens(value: str) -> frozenset[str]:
     words: list[str] = []
     current: list[str] = []
     for character in normalized:
+        # Zero-width and joining characters survive NFKC but render as nothing,
+        # so a sender could split a brand token the reviewer still reads whole.
+        if unicodedata.category(character) == "Cf":
+            continue
         if character.isalnum():
             current.append(character)
         elif current:

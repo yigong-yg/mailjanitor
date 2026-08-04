@@ -28,12 +28,22 @@ def test_punycode_domain_is_defanged() -> None:
     assert "login[.]xn--bcher-kva[.]example" in rendered
 
 
-@pytest.mark.parametrize("character", ["\n", "\0", "\u202e"])
+@pytest.mark.parametrize(
+    "character",
+    ["\n", "\0", "\u202e", "\u200b", "\u00ad", "\u2060", "\ufeff"],
+)
 def test_control_and_bidi_characters_are_made_visible(character: str) -> None:
     rendered = safe_display_text(f"before{character}after")
 
     assert "⟦U+" in rendered
     assert character not in rendered
+
+
+def test_invisible_characters_cannot_hide_a_defanged_domain() -> None:
+    rendered = safe_display_text("micro\u200bsoft.com")
+
+    assert "microsoft.com" not in rendered
+    assert "\u27e6U+200B\u27e7" in rendered
 
 
 def test_output_is_bounded_before_expansion() -> None:

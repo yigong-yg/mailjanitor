@@ -14,6 +14,10 @@ _SCHEME_PATTERN: Final = re.compile(r"(?i)\b(?:https?|ftp|mailto):")
 _BIDI_CLASSES: Final = frozenset(
     {"LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI"}
 )
+# ``Cf`` covers zero-width and joining characters such as U+200B and U+00AD.
+# They render as nothing, so leaving them intact lets a sender split a brand or
+# domain that the reviewer still reads as whole text.
+_INVISIBLE_CATEGORIES: Final = frozenset({"Cc", "Cf", "Cs"})
 _MARKDOWN_SPECIAL: Final = re.compile(r"([\\`*{}\[\]()<>#+\-.!_|])")
 _MAX_DISPLAY_LENGTH: Final = 4096
 _MAX_ADDRESS_LENGTH: Final = 320
@@ -72,7 +76,7 @@ def spreadsheet_safe(value: str, *, maximum: int = 512) -> str:
 def _visible_character(character: str) -> str:
     category = unicodedata.category(character)
     bidi = unicodedata.bidirectional(character)
-    if category in {"Cc", "Cs"} or bidi in _BIDI_CLASSES:
+    if category in _INVISIBLE_CATEGORIES or bidi in _BIDI_CLASSES:
         return f"⟦U+{ord(character):04X}⟧"
     return character
 
