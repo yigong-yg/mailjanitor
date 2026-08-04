@@ -317,6 +317,7 @@ class SqliteOperationalState:
             raise OperationalStateError("state path must be a regular file")
 
     def _initialize(self) -> None:
+        self._configure_journal_mode()
         with self._write_connection(initialize=True) as connection:
             connection.execute(
                 """
@@ -368,8 +369,39 @@ class SqliteOperationalState:
                 )
                 """
             )
+        self._restrict_permissions()
+
+    def _configure_journal_mode(self) -> None:
+        """Select WAL once per store, never inside a transaction or per call.
+
+        SQLite does not invoke the busy handler for a journal-mode change, so
+        running this on every connection makes an ordinary overlap between two
+        mailbox profiles fail immediately instead of waiting.
+        """
+        connection = self._open_connection()
+        try:
+            connection.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.Error as exc:
+            raise OperationalStateError("operational state setup failed") from exc
+        finally:
+            connection.close()
+
+    def _restrict_permissions(self) -> None:
+        """Keep the database, its WAL sidecars, and their directory owner-only.
+
+        The ``-wal`` sidecar holds the same content as the database but is
+        recreated by SQLite under the process umask, so the directory mode is
+        the control that actually protects it.
+        """
         with suppress(OSError):
-            self._path.chmod(0o600)
+            self._path.parent.chmod(0o700)
+        sidecars = (
+            self._path.with_name(f"{self._path.name}-wal"),
+            self._path.with_name(f"{self._path.name}-shm"),
+        )
+        for path in (self._path, *sidecars):
+            with suppress(OSError):
+                path.chmod(0o600)
 
     @contextmanager
     def _read_connection(self) -> Iterator[sqlite3.Connection]:
@@ -407,9 +439,7 @@ class SqliteOperationalState:
         try:
             connection = sqlite3.connect(self._path, timeout=5.0)
             connection.execute("PRAGMA foreign_keys = ON")
-            connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("PRAGMA synchronous = FULL")
-            connection.execute("PRAGMA busy_timeout = 5000")
         except sqlite3.Error as exc:
             if connection is not None:
                 connection.close()

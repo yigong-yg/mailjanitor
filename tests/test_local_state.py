@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -230,3 +231,16 @@ def test_profile_lock_release_survives_a_failing_unlink(
 
     stale = tmp_path / f"state.sqlite3.{MAILBOX_REF}.lock"
     assert stale.exists()
+
+
+def test_journal_mode_is_configured_once_and_survives_reopen(tmp_path: Path) -> None:
+    path = tmp_path / "state.sqlite3"
+    make_state(path.parent)
+    probe = sqlite3.connect(path)
+    try:
+        assert probe.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    finally:
+        probe.close()
+
+    reopened = SqliteOperationalState(path)
+    assert reopened.get(DIGEST_A) is None
