@@ -40,7 +40,7 @@ path = "src/mailjanitor/__init__.py"
 
 [dependency-groups]
 dev = [
-  "hypothesis>=6,<7",
+  "hypothesis>=6.165.9,<7",
   "mypy>=1.15,<2",
   "pytest>=8,<10",
   "pytest-cov>=6,<8",
